@@ -1,4 +1,6 @@
 # Day 3 class work
+library("dplyr")
+library("tidyr")
 
 setwd("d:/DataScienceCourse/data-science-univer/datasets/day3")
 
@@ -72,9 +74,9 @@ pie(pp, labels = c("X4046", "X4225", "X4770"))
 
 
 ######### Task 9 #########
-## In which region mean avg. price was the highest, and in which state - the lowest
-df %>%  group_by(region) %>% summarise(mean_price = mean(AveragePrice)) %>% arrange(mean_price)
-df %>%  group_by(region) %>% summarise(mean_price = mean(AveragePrice)) %>% arrange(desc(mean_price))
+## In which region mean avg. price was the highest, and in which region - the lowest
+df %>%  group_by(region) %>% summarise(mean_price = mean(AveragePrice)) %>% arrange(mean_price) %>% head(n = 3)
+df %>%  group_by(region) %>% summarise(mean_price = mean(AveragePrice)) %>% arrange(desc(mean_price)) %>% head(n = 3)
 ## The lowest mean avg. price was in Houston
 ## The highest mean avg. price was in HartfordSpringfield
 ##########################
@@ -85,7 +87,60 @@ df %>%  group_by(region) %>% summarise(mean_price = mean(AveragePrice)) %>% arra
 #df[,c(3:12,14:15)]
 t10 <- df[,c(3:12,14:15)]
 
+t11 <- t10 %>% group_by(region, type) %>% summarise(avg_price = mean(AveragePrice), tot_vol = sum(Total.Volume),
+                                                    tot_4046 = sum(X4046), tot_4225 = sum(X4225),
+                                                    tot_4770 = sum(X4770), tot_bags = sum(Total.Bags),
+                                                    tot_small.bags = sum(Small.Bags), tot_large.bags = sum(Large.Bags),
+                                                    tot_xlarge.bags = sum(XLarge.Bags), tot_profit = sum(Profit))
 
 
-t11 <- t10 %>% group_by(region, type) %>% summarise_all(funs(tot = sum)) %>% arrange(X4046_tot, type)
+# Spread multiple columns for conventional/organic types
+library(data.table)
+t12 <- dcast(setDT(t11), region ~ type, value.var = colnames(t11)[3:12])
 
+########### USED STANDARD DIST INSTEAD ##################
+# Install and load "distances" library to calculate 'distance' between regions
+#install.packages("distances", dep = TRUE)
+#library(distances)
+#my_dm <- distances(t12, id_variable = "region", dist_variables = colnames(t12)[2:21])
+#########################################################
+
+region_dist <- dist(t12[,2:21])
+hist(region_dist, breaks = 100)
+plot(density(region_dist))
+region_dist_cleaned <- region_dist[region_dist < 3e+08] # 2e+08
+plot(density(region_dist_cleaned))
+
+min_distances <- region_dist_cleaned[region_dist_cleaned < (median(region_dist_cleaned) - 1.09*sd(region_dist_cleaned))]
+
+region_dist_matr <- as.matrix(region_dist) # Create full matrix from dist. object
+
+## Finds indexes of elements with the given  "vals" values in "matr" matrix
+indexOf <- function(matr, vals) {
+    res <- c()
+    row_num <- dim(matr)[1]
+    col_num <- dim(matr)[2]
+    for (val in vals) {
+        for (i in 1:row_num) {
+            for (j in 1:col_num) {
+                if (abs(val - matr[i,j]) < 1) {
+                  res <- c(res, c(val, i,j))
+                  break
+                }
+            }
+        }
+    }
+  return(res)
+}
+
+indexOf(region_dist_matr, min_distances)
+
+# (4,48)  -- Boise, Spokane
+# (24,35) -- Louisville, Pittsburgh
+# (24,48) -- Louisville, Spokane
+# (27,49) -- Nashville, StLouis
+# (48,50) -- Spokane, Syracuse
+
+ttt <- t12 %>% filter(region %in% c("Boise", "Spokane", "Louisville", "Pittsburgh", "Syracuse"))
+ttt <- t12 %>% filter(region %in% c( "Spokane", "Boise"))
+ttt <- t12 %>% filter(region %in% c( "Nashville", "StLouis"))

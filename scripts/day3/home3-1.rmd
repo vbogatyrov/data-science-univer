@@ -1,0 +1,216 @@
+---
+title: "Avocado sales analysis"
+author: "vbogatyrov"
+date: "February 18, 2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, include=FALSE}
+library("dplyr")
+```
+
+## Tasks 1 & 2
+
+*Description:* Load two data frames from csv-files and join them into a single data frame.
+
+To begin with, data frames need to be loaded from csv-files.
+
+```{r , results='hide'}
+setwd("d:/DataScienceCourse/data-science-univer/datasets/day3")
+df <- read.csv("DataDay3a.csv", dec = ".", sep = ";")
+df2 <- read.csv("DataDay3b.csv", dec = ".", sep = ";")
+```
+
+Next step is to remove empty columns from `df2`
+```{r}
+df2$X <- NULL
+df2$X.1 <- NULL
+df2$X.2 <- NULL
+df2$X.3 <- NULL
+df2$X.4 <- NULL
+df2$X.5 <- NULL
+df2$X.6 <- NULL
+```
+
+And finally, join the data frame and remove the one which is not needed anymore.
+```{r}
+df <- left_join(df, df2, by = "id")
+rm(df2)
+```
+
+## Task 3
+*Description:* Add "Profit" column
+```{r}
+df$Profit <- df$Total.Volume * df$AveragePrice
+```
+
+## Task 4
+*Description:* Find profit from sales of organic and conventional avocado
+```{r, echo=TRUE}
+df %>% group_by(type) %>% summarise(total_profit_by_type = sum(Profit))
+```
+
+## Task 5
+*Description:* Which year is the most successfull?
+```{r, echo=TRUE}
+df %>% group_by(year) %>% summarise(annual_profit = sum(Profit)) %>% arrange(desc(annual_profit))
+```
+
+## Task 6
+*Description:* Plot 3 graphics of dependencies of avg. price from number of packs of different size. Is there an obvious pattern?
+
+All three diagrams look pretty the same, so let's print just one of them:
+```{r Price/vol. dependency, echo=TRUE}
+plot(df$Large.Bags, df$AveragePrice)
+```
+
+Ii is clearly seen that if the number of packs is small, the avg. price varies greatly. On the other hand, when the number of packs is large enough, avg. price is getting closer to some narrow price range.
+
+## Task 7
+*Description:* Are there eruptions in sales volumnes?
+
+To check it, let's print box diagram.
+```{r, echo=TRUE}
+boxplot(df$Total.Volume)
+```
+
+It could be seen from the diagram, that there are eruptions in sales volumes.
+
+## Task 8
+*Description:* Draw pie diagram of sales volumes per different type of avocado sold in 2017
+
+First, get the needed data
+```{r, results='hide'}
+pp <- df %>% filter(year == 2016) %>% summarise(t4046 = sum(X4046), t4225 = sum(X4225), t4770 = sum(X4770))
+```
+Becaue pie plotting function does not accept data in data.frame format, it needs to be converted into vector before printing
+```{r, results='hide'}
+pp <- as.numeric(pp[1,])
+```
+And finally, print the diagram
+```{r}
+pie(pp, labels = c("X4046", "X4225", "X4770"))
+```
+
+## Task 9
+*Description:* In which region mean avg. price was the highest, and in which region - the lowest
+```{r, echo=TRUE}
+df %>%  group_by(region) %>% summarise(mean_price = mean(AveragePrice)) %>% arrange(desc(mean_price)) %>% head(n = 3)
+df %>%  group_by(region) %>% summarise(mean_price = mean(AveragePrice)) %>% arrange(mean_price) %>% head(n = 3)
+```
+The highest mean avg. price was in *HartfordSpringfield*, and the lowest one was in *Houston*.
+
+## Task 10
+*Description:* Which regions are similar in terms of avocado sales?
+
+First, let's select only needed columns
+```{r}
+t10 <- df[,c(3:12,14:15)]
+```
+Now, let's summarize data by region and avocado type(organic/conventional), calculating mean price and total amouns of sold bags, packs, volumes and profit.
+```{r}
+t11 <- t10 %>% group_by(region, type) %>% summarise(avg_price = mean(AveragePrice), tot_vol = sum(Total.Volume), 
+  tot_4046 = sum(X4046), tot_4225 = sum(X4225),
+  tot_4770 = sum(X4770), tot_bags = sum(Total.Bags),
+  tot_small.bags = sum(Small.Bags), tot_large.bags = sum(Large.Bags),
+  tot_xlarge.bags = sum(XLarge.Bags), tot_profit = sum(Profit))
+```
+Table with the summaries `t11` looks like this:
+```{r, echo=FALSE}
+head(t11)
+```
+There are two summary entries for each region in `t11`, the one for conventional and the one for organic avocado types. Let's make the data structure more 'tidy' by creating columns for each variable for both avocado types. After the modification, the resulting summary table `t12` will contain one row per region with summary columns for both avocado types. The converion is done by the following code:
+```{r, message=FALSE}
+library(data.table)
+t12 <- dcast(setDT(t11), region ~ type, value.var = colnames(t11)[3:12]) 
+```
+The resulting summary table `t12` will have one row per region with the following columns
+```{r, echo=FALSE}
+#head(t12, n = 2)
+colnames(t12)
+```
+To find similar let's calculate Euclidian distance between regions, and find pairs of regions with a close distance between each other.
+```{r}
+region_dist <- dist(t12[,2:21])
+```
+```{r, echo=FALSE}
+hist(region_dist, breaks = 100)
+```
+
+Basing on the histogram, there are some eruptions of distance, which can be dropped
+```{r}
+region_dist_cleaned <- region_dist[region_dist < 3e+08] # 2e+08
+```
+
+Let's have a closer look at distance distribution density:
+```{r, echo=FALSE}
+plot(density(region_dist_cleaned), main = "Distribution density of distance between regions")
+```
+
+To find the smallest distances, let's take the following approach:
+```{r}
+min_distances <- region_dist_cleaned[region_dist_cleaned < (median(region_dist_cleaned) - 1.09*sd(region_dist_cleaned))]
+```
+```{r, echo=FALSE}
+min_distances
+```
+
+For ease of finding pairs of regions with the given distance between them, let's convert distances vector to a matrix, in which element *(i,j)* represents distance between *i* and *j* regions.
+```{r}
+region_dist_matr <- as.matrix(region_dist) # Create full matrix from dist. object
+```
+
+To finds indexes of elements with the given  values in the matrix let's use the following custom function:
+```{r}
+indexOf <- function(matr, vals) {
+    res <- c()
+    row_num <- dim(matr)[1]
+    col_num <- dim(matr)[2]
+    for (val in vals) {
+        for (i in 1:row_num) {
+            for (j in 1:col_num) {
+                if (abs(val - matr[i,j]) < 1) {
+                  res <- c(res, c(val, i,j))
+                  break
+                }
+            }
+        }
+    }
+  return(res)
+}
+```
+Applying the function `indexOf(region_dist_matr, min_distances)` produces the follwing result:
+```{r, echo=FALSE}
+indexOf(region_dist_matr, min_distances)
+```
+Which means, that there are following pairs:
+```{r, include=FALSE}
+library(knitr)
+tmp <- matrix(nrow = 5, ncol = 3)
+tmp[1,] <- c( 4,48,5069770)
+tmp[2,] <- c(24,48,6313226)
+tmp[3,] <- c(27,49,6729214)
+tmp[4,] <- c(24,35,6972834)
+tmp[5,] <- c(48,50,7009040)
+```
+```{r, echo=FALSE}
+kable(tmp, col.names = c("I","J","Distance"))
+```
+
+Substitution of indexes by actual region names gives the following
+```{r, include=FALSE}
+tmp[1,] <- c("Boise","Spokane",5069770)
+tmp[2,] <- c("Louisville","Spokane",6313226)
+tmp[3,] <- c("Nashville","StLouis",6729214)
+tmp[4,] <- c("Louisville","Pittsburgh",6972834)
+tmp[5,] <- c("Spokane","Syracuse",7009040)
+```
+```{r, echo=FALSE}
+kable(tmp, col.names = c("Region","Region","Distance"))
+```
+
+
