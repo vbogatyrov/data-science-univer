@@ -101,3 +101,53 @@ isLinear <- function(x, y) {
     return(F)
   }
 }
+##########################################################################
+############################  TASK 3  ###################################
+##########################################################################
+
+eur_usd <- read.csv("Day5-EUR_USD.csv", dec = ".", sep = ",")
+eur_usd$Date <- eur_usd$ï..Date
+eur_usd$ï..Date <- NULL
+str(eur_usd)
+eur_usd$Date <- as.Date(eur_usd$Date, format = "%b %d, %Y")
+
+min(eur_usd$Date)
+#eur_usd <- 
+eur_usd <- eur_usd %>% arrange(eur_usd$Date)
+
+
+eur_usd$Date[1] - as.Date("2015-1-1")
+ts_price <- ts(eur_usd$Price, frequency = 365, start = c(2015, 256))
+plot(ts_price)
+ts_low_price  <- ts(eur_usd$Low, frequency = 365, start = c(2015, 256))
+plot(ts_low_price)
+ts_high_price <- ts(eur_usd$High, frequency = 365, start = c(2015, 256))
+plot(ts_high_price)
+
+acf(ts_price, lag.max = 42)
+dec_price <- decompose(ts_price)
+plot(dec_price)
+
+acf(ts_low_price, lag.max = 42)
+dec_low_price <- decompose(ts_low_price)
+plot(dec_low_price)
+
+acf(ts_high_price, lag.max = 42)
+dec_high_price <- decompose(ts_high_price)
+plot(dec_high_price)
+
+ts_price2 <- ts_price
+eur_usd$price_wo_seasonal <- eur_usd$Price - dec_price$seasonal
+ts_price_wo_seasonal <- ts(eur_usd$price_wo_seasonal, frequency = 365, start = c(2015, 256))
+plot(ts_price_wo_seasonal)
+
+library(forecast)
+library(plm)
+
+model <- arima(ts_price, order = c(1,1,1))
+AIC(model)
+forec <- forecast(model, h = 7)
+plot(forec, xlim=c(2017,2018))
+
+
+acf(ts_price_wo_seasonal, lag.max = 42)
