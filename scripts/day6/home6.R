@@ -3,9 +3,10 @@
 library('dplyr')
 library('tidyr')
 library('ggplot2')
-library(VIM)
-library(mice)
+library('VIM')
+library('mice')
 
+setwd("d:/DataScienceCourse/data-science-univer/datasets/day4")
 titanic <- read.csv("Day6-titanic.csv", sep = ",", dec = ".")
 
 ### Avg. age of survived passanger
@@ -21,8 +22,8 @@ titanic %>% filter(Survived == 1) %>% select(Embarked) %>% group_by(Embarked) %>
 
 ### Piechart of passangers of certain cabin class
 cabin_class_passgrs <-titanic %>% select(Pclass) %>% group_by(Pclass) %>% summarise(passgrs = n())
-pie(cabin_class_passgrs$passgrs, main = "Passanger cabin classes", labels=cabin_class_passgrs$passgrs, col= c(1,2,3))
-legend("bottomright", legend=c("1st class", "2nd class", "3rd class"), cex=0.8, fill= c(1,2,3))
+pie(cabin_class_passgrs$passgrs, main = "Passanger cabin classes", labels=cabin_class_passgrs$passgrs, col= c(2,3,4))
+legend("bottomright", legend=c("1st class", "2nd class", "3rd class"), cex=0.8, fill= c(2,3,4))
 
 
 ### ???????????????????????????????????????????????????????????
@@ -30,9 +31,11 @@ legend("bottomright", legend=c("1st class", "2nd class", "3rd class"), cex=0.8, 
 plot(titanic$Age, titanic$Fare) # shows no correlation
 titanic_age_no_na <- titanic %>% filter(!is.na(Age))
 tmp <- titanic_age_no_na %>% select(Age, Fare)
-tmp$ratio <- 
-hist(tmp)
 
+titanic$age_group <- cut(titanic$Age, breaks = c(0,5,10,15,20,25,30,35,40,45,50,55,60,65,70,75,80,85,90))
+age_fare <- titanic %>% select(Fare, age_group) %>% group_by(age_group) %>% summarise(mean_fare = mean(Fare))
+plot(age_fare)
+hist(age_fare)
 
 ### Fill in NA's
 md.pattern(titanic)
