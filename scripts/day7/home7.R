@@ -32,8 +32,7 @@ colnames(imports_raw)[1] <- "Country.Name"
 ###################################################################################
 ######   REMOVE YEARS WITH TOO MANY NA's
 ###################################################################################
-cc <- colnames(literacy)[2:60]
-#literacy[, cc[20]]
+cc <- colnames(energy)[2:60]
 #######
 na_s_per_column <- function(df) {
    na_vector <- vector(mode = "integer", length = 59)
@@ -49,13 +48,12 @@ na_s_per_column <- function(df) {
    return(na_vector)
 }
 #######
-na_literacy <- na_s_per_column(literacy) / 264
 na_energy <- na_s_per_column(energy) / 264
 na_imports <- na_s_per_column(imports) / 264
 na_life <- na_s_per_column(life) / 264
 na_reserves <- na_s_per_column(reserves) / 264
 
-year_nas <- data_frame("col" = cc, "literacy" = na_literacy, 
+year_nas <- data_frame("col" = cc,
                        "energy" = na_energy, "imports" = na_imports, 
                        "life" = na_life, "reservers" = na_reserves)
 ########################################################
@@ -112,31 +110,7 @@ energy <-energy %>% filter(Country.Code %in% country_nas$country)
 imports <- imports %>% filter(Country.Code %in% country_nas$country)
 life <- life %>% filter(Country.Code %in% country_nas$country)
 reserves <- reserves %>% filter(Country.Code %in% country_nas$country)
-######################################################
-#energy_tmp <- energy
-#na.approx(energy_tmp,na.rm=F)
-#na.spline(sleep,na.rm=F)
-#na.spline(energy,na.rm=T)
-#na.approx(energy, na.rm = T)
-######################################################
-#tmp <- literacy
-#imp <- mice(tmp, seed = 1234)
-#res <- complete(imp, action=2) 
-
-###### Convert data to long format ######
-#long_filled <- function(df) {
-#   df_long <- df %>% gather(year, value, X1970:X2015)
-#   tmp <- df_long
-#   imp <- mice(tmp, seed = 1234, m = 1)
-#   res <- complete(imp, action = 1)
-#   df_long <- res
-#   return(df_long)
-#}
-#energy_long <- long_filled(energy)
-#imports_long <- long_filled(imports)
-#life_long <- long_filled(life)
-#reserves_long <- long_filled(reserves)
-
+#########################################################################
 long_unfilled <- function(df) {
    df_long <- df %>% gather(year, value, X1970:X2015)
    return(df_long)
@@ -152,10 +126,9 @@ colnames(all_long)[3] <- "energy"
 all_long$imports <- imports_long$value
 all_long$life <- life_long$value
 all_long$reserves <- reserves_long$value
-all_long$literacy <- literacy_long$value
+all_long <- all_long[, c(1:4, 6,5)]
 ################################################
 years <- unique(all_long$year)
-tmp_tables <- array(dim = c(46))
 #tmp_table <- all_long %>% filter(year == "X1980")
 #tmp <- tmp_table
 #imp <- mice(tmp, seed = 4311, m = 1, method = "rf")
@@ -183,11 +156,6 @@ all_long <- joined_table
 ######  Normalize all_long table  ######
 ########################################
 
-
-country_nas <- country_nas[, c(1,6, 2:5)]
-all_long <- all_long[, c(1:4, 6,5)]
-
-
 all_norm <- all_long
 all_norm$Country.Code <- NULL
 all_norm$year <- NULL
@@ -196,7 +164,6 @@ max = apply(all_norm , 2 , max)
 min = apply(all_norm, 2 , min)
 scaled = as.data.frame(scale(all_norm, center = min, scale = max - min))
 all_norm <- scaled
-
 
 
 # Generate random set of indexes for training data
@@ -209,9 +176,13 @@ f<-as.formula("life ~ energy + imports + reserves")
 NN = neuralnet(f, trainNN, hidden = c(2,3) )
 
 predict_testNN = compute(NN, testNN[,c(1:3)])
-predict_testNN = (predict_testNN$net.result * (max(all_long$life) - min(all_long$life))) + min(all_long$life)
+#predict_testNN = (predict_testNN$net.result * (max(all_long$life) - min(all_long$life))) + min(all_long$life)
 
 testNN$life_predicted <- predict_testNN$net.result
+
+## Error
+err <- sqrt(sum((testNN$life-testNN$life_predicted)^2) / nrow(testNN))
+err/mean(testNN$life) ## error %
 
 ## TODO Scale testNN back to real values
 
